@@ -7,11 +7,11 @@ queue_url = "https://sqs.us-east-1.amazonaws.com/440848399208/sbx3sw"
 sqs = boto3.client('sqs')
 api_url = "https://j9y2xa0vx0.execute-api.us-east-1.amazonaws.com/api/scatter/sbx3sw"
 
-payload = requests.post(url).json
+#payload = requests.post(api_url).json()
 
 def initialize_queue():
     try:
-        response = request.post(api_url)
+        response = requests.post(api_url)
         response.raise_for_status()
         payload = response.json()
         print("Queue initialized - 21 messages")
@@ -24,18 +24,14 @@ def initialize_queue():
 #    resp = requests.post(api_url)
 #    rasp.raise_for_status()
 
-def delete_message(queue_url, receipt_handle):
-    try:
-        sqs.delete_message(QueueUrl
-
 def get_messages(queue_url, expected_count=21, max_wait=1000):
     all_messages = []
-    start_time = time.time
+    start_time = time.time()
     try:
         while len(all_messages) < expected_count and (time.time() - start_time) < max_wait:
             try:
                 response = sqs.receive_message(
-                    QueueUrl=url,
+                    QueueUrl=queue_url,
                     MessageSystemAttributeNames=['All'],
                     MaxNumberOfMessages=10,
                     VisibilityTimeout=60,
@@ -84,10 +80,7 @@ def get_queue_attributes(queue_url, expected_count=21):
         delayed = int(attrs.get('ApproximateNumberOfMessagesDelayed', 0))
         total = visible + not_visible + delayed
 
-        print(f"Visible Messages: {visible}")
-        print(f"Not visible messages: {not_visible}")
-        print(f"delayed messages: {delayed}")
-        print(f"total messages: {total}/{expected_count}")
+        print(f"Visible Messages: {visible}, Not visible messages: {not_visible}, delayed messages: {delayed}, total messages: {total}/{expected_count}")
 
         return {
             "visible": visible,
@@ -109,7 +102,7 @@ def wait_for_all_messages(queue_url, expected_count=21, timeout=1000, check_inte
             print("all expected messages are now in the queue")
             return True
         else:
-            print(f"Waiting for all messages ({counts['total']}/{expected_count}) total")
+            print(f"Waiting for all messages ({counts['total']}/{expected_count})")
             time.sleep(check_interval)
     print("Timeout waiting for all messages")
     return False
