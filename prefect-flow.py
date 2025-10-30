@@ -12,6 +12,8 @@ api_url = "https://j9y2xa0vx0.execute-api.us-east-1.amazonaws.com/api/scatter/sb
 def initialize_queue():
     try:
         response = requests.post(api_url)
+        if response.status_code != 200:
+            print(f"Init queue failed ({response.status_code}): {response.text}")
         response.raise_for_status()
         payload = response.json()
         print("Queue initialized - 21 messages")
@@ -24,47 +26,47 @@ def initialize_queue():
 #    resp = requests.post(api_url)
 #    rasp.raise_for_status()
 
-def get_messages(queue_url, expected_count=21, max_wait=1000):
-    all_messages = []
-    start_time = time.time()
-    try:
-        while len(all_messages) < expected_count and (time.time() - start_time) < max_wait:
-            try:
-                response = sqs.receive_message(
-                    QueueUrl=queue_url,
-                    MessageSystemAttributeNames=['All'],
-                    MaxNumberOfMessages=10,
-                    VisibilityTimeout=60,
-                    MessageAttributeNames=['All'],
-                    WaitTimeSeconds=30
-                )
-                messages = response.get("Messages", [])
-                if messages:
-                    for msg in messages:
-                        all_messages.append(msg)
-                        print(f"Recieved message {len(all_messages)} / {expected_count}")
-                        try:
-                            sqs.delet_message(
-                                QueueUrl=queue_url,
-                                ReceiptHandle=msg["ReceiptHandle"]
-                            )
-                            print("Deleted message from queue")
-                        except (BotoCoreError, ClientError) as delete_error:
-                            print(f"Error deleting message: {delete_error}")
-                else:
-                    print("Waiting for delayed messages")
-                time.sleep(5)
-            except (BotoCoreError, ClientError) as sqs_error:
-                print(f"Error communicating with SQS: {sqs_error}")
-                time.sleep(10)
-        if len(all_messages) < expected_count:
-            print(f"Only recieved {len(all_messages)} of {expected_count} messages after {max_waits}s")
-        else:
-            print("All 21 messages recieved")
-    except Exception as e:
-        print(f"Error while polling messages: {e}")
-        return e
-    return all_messages
+#def get_messages(queue_url, expected_count=21, max_wait=1000):
+#    all_messages = []
+#    start_time = time.time()
+#    try:
+#        while len(all_messages) < expected_count and (time.time() - start_time) < max_wait:
+#            try:
+#                response = sqs.receive_message(
+#                    QueueUrl=queue_url,
+#                    MessageSystemAttributeNames=['All'],
+#                    MaxNumberOfMessages=10,
+#                    VisibilityTimeout=60,
+#                    MessageAttributeNames=['All'],
+#                    WaitTimeSeconds=30
+#                )
+#                messages = response.get("Messages", [])
+#                if messages:
+#                    for msg in messages:
+#                        all_messages.append(msg)
+#                        print(f"Recieved message {len(all_messages)} / {expected_count}")
+#                        try:
+#                            sqs.delet_message(
+#                                QueueUrl=queue_url,
+#                                ReceiptHandle=msg["ReceiptHandle"]
+#                            )
+#                            print("Deleted message from queue")
+#                        except (BotoCoreError, ClientError) as delete_error:
+#                            print(f"Error deleting message: {delete_error}")
+#                else:
+#                    print("Waiting for delayed messages")
+#                time.sleep(5)
+#            except (BotoCoreError, ClientError) as sqs_error:
+#                print(f"Error communicating with SQS: {sqs_error}")
+#                time.sleep(10)
+#        if len(all_messages) < expected_count:
+#            print(f"Only recieved {len(all_messages)} of {expected_count} messages after {max_waits}s")
+#        else:
+#            print("All 21 messages recieved")
+#    except Exception as e:
+#        print(f"Error while polling messages: {e}")
+#        return e
+#    return all_messages
 
 
 def get_queue_attributes(queue_url, expected_count=21):
@@ -97,7 +99,7 @@ def get_queue_attributes(queue_url, expected_count=21):
 def wait_for_all_messages(queue_url, expected_count=21, timeout=1000, check_interval=30):
     start = time.time()
     while (time.time() - start) < timeout:
-        counts = get_queue_attribues(queue_url, expected_count)
+        counts = get_queue_attributes(queue_url, expected_count)
         if counts["total"] >= expected_count:
             print("all expected messages are now in the queue")
             return True
@@ -159,26 +161,65 @@ def receive_and_process_messages(queue_url, expected_count=21):
     print(f"All {len(processed_messages)} messages processed and deleted")
     return processed_messages
 
+def send_solution(uvaid, phrase, platform="prefect"):
+    submit_url = "https://sqs.us-east-1.amazonaws.com/440848399208/dp2-submit"
+    try:
+        response = sqs.send_message(
+            QueueUrl=submit_url,
+            MessageBody="Solution submission",
+            MessageAttributes={
+                'uvaid': {
+                    'DataType': 'String',
+                    'StringValue': uvaid
+                },
+                'phrase': {
+                    'DataType': 'String',
+                    'StringValue': phrase
+                },
+                'platform': {
+                    'DataType': 'String',
+                    'StringValue': platform
+                }
+            }
+        )
+        status_code = response["ResponseMetadata"]["HTTPStatusCode"]
+        if status_code == 200:
+            print("Solution successfully submitted to SQS!")
+        else:
+            print(f"SQS returned status code {status_code}")
+
+        print(f"Response: {response}")
+        return response
+
+    except Exception as e:
+        print(f"Error sending solution: {e}")
+        raise
+
 def run_pipeline():
     print("Starting pipeline")
-
-    ready = wait_for_all_messages(queue_url, expected_count=21)
-
-    if ready:
-        data = receive_and_process_messages(queue_url, expected_count=21)
-        print("Final processed message data:")
-        for item in data:
-            print(f"Order No: {item['order_no']} | Word: {item['word']}")
-    else:
-        print("not all messages arrived before timeout, exiting pipeline")
-
-
-if __name__ = "__main__":
     initialize_queue()
-    try:
-        messages = get_all_messages(queue_url)
-        print(f"{len(messages)} messages retrieved")
-    except Exception as e:
-        print(f"pipeline failed: {e}")
+
+    ready =  wait_for_all_messages(queue_url, expected_count=21)
+    if not ready:
+        print("Not all messages arrived before timeout, exiting pipeline")
+        return
+
+    data = receive_and_process_messages(queue_url, expected_count=21)
+
+    phrase_parts = sorted(data, key=lambda x: int(x['order_no']))
+    phrase = " ".join([p["word"] for p in phrase_parts])
+    print(f"\nFinal completed phrase:\n{phrase}\n")
+
+    send_solution(uvaid="sbx3sw", phrase=phrase, platform="prefect")
+
+
+if __name__ == "__main__":
+    run_pipeline()
+#    initialize_queue()
+#    try:
+#        messages = get_all_messages(queue_url)
+#        print(f"{len(messages)} messages retrieved")
+#    except Exception as e:
+#        print(f"pipeline failed: {e}")
 #    get_queue_atributes(url)
 
