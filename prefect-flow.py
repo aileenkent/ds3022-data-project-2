@@ -7,8 +7,6 @@ queue_url = "https://sqs.us-east-1.amazonaws.com/440848399208/sbx3sw"
 sqs = boto3.client('sqs')
 api_url = "https://j9y2xa0vx0.execute-api.us-east-1.amazonaws.com/api/scatter/sbx3sw"
 
-#payload = requests.post(api_url).json()
-
 def initialize_queue():
     try:
         response = requests.post(api_url)
@@ -21,53 +19,6 @@ def initialize_queue():
     except requests.exceptions.RequestException as e:
         print(f"Error initializing queue: {e}")
         raise e
-
-#def populate_queue_once():
-#    resp = requests.post(api_url)
-#    rasp.raise_for_status()
-
-#def get_messages(queue_url, expected_count=21, max_wait=1000):
-#    all_messages = []
-#    start_time = time.time()
-#    try:
-#        while len(all_messages) < expected_count and (time.time() - start_time) < max_wait:
-#            try:
-#                response = sqs.receive_message(
-#                    QueueUrl=queue_url,
-#                    MessageSystemAttributeNames=['All'],
-#                    MaxNumberOfMessages=10,
-#                    VisibilityTimeout=60,
-#                    MessageAttributeNames=['All'],
-#                    WaitTimeSeconds=30
-#                )
-#                messages = response.get("Messages", [])
-#                if messages:
-#                    for msg in messages:
-#                        all_messages.append(msg)
-#                        print(f"Recieved message {len(all_messages)} / {expected_count}")
-#                        try:
-#                            sqs.delet_message(
-#                                QueueUrl=queue_url,
-#                                ReceiptHandle=msg["ReceiptHandle"]
-#                            )
-#                            print("Deleted message from queue")
-#                        except (BotoCoreError, ClientError) as delete_error:
-#                            print(f"Error deleting message: {delete_error}")
-#                else:
-#                    print("Waiting for delayed messages")
-#                time.sleep(5)
-#            except (BotoCoreError, ClientError) as sqs_error:
-#                print(f"Error communicating with SQS: {sqs_error}")
-#                time.sleep(10)
-#        if len(all_messages) < expected_count:
-#            print(f"Only recieved {len(all_messages)} of {expected_count} messages after {max_waits}s")
-#        else:
-#            print("All 21 messages recieved")
-#    except Exception as e:
-#        print(f"Error while polling messages: {e}")
-#        return e
-#    return all_messages
-
 
 def get_queue_attributes(queue_url, expected_count=21):
     try:
@@ -91,7 +42,6 @@ def get_queue_attributes(queue_url, expected_count=21):
             "total": total,
         }
 
-#        print(f"Response: {response}")
     except Exception as e:
         print(f"Error getting queue attributes: {e}")
         return {"visible": 0, "not_visible": 0, "delayed": 0, "total": 0}
@@ -215,11 +165,4 @@ def run_pipeline():
 
 if __name__ == "__main__":
     run_pipeline()
-#    initialize_queue()
-#    try:
-#        messages = get_all_messages(queue_url)
-#        print(f"{len(messages)} messages retrieved")
-#    except Exception as e:
-#        print(f"pipeline failed: {e}")
-#    get_queue_atributes(url)
 
